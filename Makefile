@@ -3,7 +3,7 @@
 #		Copyright (C) 1984-2015 Core lab. <djshin.core.kaist.ac.kr>
 #
 
-MODULES = 2_1_module 2_2_module 2_3_module 2_4_module          # Your c file name 
+MODULES = 2_1_module 2_2_module 2_3_module 2_4_module linkedlist_skel.c          # Your c file name 
 # You should modify this line with your DIR name
 BB_KERNEL = /home/ina/Desktop/EE516/bb-kernel
 
