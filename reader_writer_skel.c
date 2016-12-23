@@ -8,7 +8,8 @@
 #define NUMWRITE 10			// Number of Writers
 
 #define DEVICE_NAME "/dev/DUMMY_DEVICE"
-#define NUMLOOP 10 
+#define NUMLOOP 2 
+#define NUMMAX 10
 
 
 /* Writer function */
@@ -27,7 +28,7 @@ void *write_func(void *arg) {
     }
 
     for (i = 0; i < NUMLOOP; i++) {
-        value = rand();
+        value = rand() % NUMMAX ;
         write(fd, &value, 1);
         printf("writer %d: write value %d\n", index, value);
     }
@@ -50,9 +51,8 @@ void *read_func(void *arg) {
     }
 
     for (i = 0; i < NUMLOOP; i++) {
-        value = rand();
         read(fd, &value, 1);
-        printf("reader %d: write value %d\n", index, value);
+        printf("reader %d: read value %d\n", index, value);
     }
 }
 
@@ -64,14 +64,15 @@ int main(void)
     int read_ids[NUMREAD], write_ids[NUMWRITE];
 
     srand(time(NULL));
-    for (i = 0; i < NUMWRITE; i++) {
-        write_ids[i] = i;
-        pthread_create(&write_thread[i], NULL, read_func, &write_ids[i]);
-    }
 
     for (i = 0; i < NUMREAD; i++) {
         read_ids[i] = i;
         pthread_create(&read_thread[i], NULL, write_func, &read_ids[i]); 
+    }
+
+    for (i = 0; i < NUMWRITE; i++) {
+        write_ids[i] = i;
+        pthread_create(&write_thread[i], NULL, read_func, &write_ids[i]);
     }
 
     for (i = 0; i < NUMWRITE; i++) {

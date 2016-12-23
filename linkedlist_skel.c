@@ -14,6 +14,7 @@
 #include <linux/random.h>
 
 #define DUMMY_MAJOR_NUMBER 250
+#define NUMMAX 10
 #define DUMMY_DEVICE_NAME "DUMMY_DEVICE"
 
 typedef struct _linkedlist_t {
@@ -48,21 +49,22 @@ static int linkedlist_len = 0;
 
 static void random_insert(int value)
 {
-    linkedlist_t *temp_node, *new_node;
+    linkedlist_t *iter_node, *new_node;
     int i;
-    int rand_pos = get_random_int(); 
+    int rand_pos = get_random_int() % (linkedlist_len + 1); 
 
     down(&sem);
-    temp_node = linkedlist_head;
-    for (i = 0; i <rand_pos; i++) 
-        temp_node = temp_node->next;
+    //printk("random insert: value=%d, rand_pos=%d, linkedlist_len=%d\n", value, rand_pos, linkedlist_len);
+    iter_node = linkedlist_head;
+    for (i = 0; i < rand_pos; i++) 
+        iter_node = iter_node->next;
     
-    if(temp_node->next == NULL)
+    if(rand_pos == linkedlist_len)
     {
         new_node = (linkedlist_t *)kmalloc(sizeof(linkedlist_t), __GFP_IO | __GFP_FS);
         new_node->value = value;
         new_node->next = NULL;
-        temp_node->next = new_node;
+        iter_node->next = new_node;
 
         printk("random insert: write %d on %d position in the linked list\n", value, rand_pos); 
     }
@@ -70,8 +72,8 @@ static void random_insert(int value)
     {
         new_node = (linkedlist_t *)kmalloc(sizeof(linkedlist_t), __GFP_IO | __GFP_FS);
         new_node->value = value;
-        new_node->next = temp_node->next;
-        temp_node->next = new_node;
+        new_node->next = iter_node->next;
+        iter_node->next = new_node;
 
         printk("random insert: write %d on %d position in the linked list\n", value, rand_pos); 
     }
@@ -81,25 +83,53 @@ static void random_insert(int value)
 
 static int random_delete(void)
 {
-    linkedlist_t *prev_node, *temp_node;
+    linkedlist_t *prev_node, *iter_node;
     int pos = 0;
-    int value = get_random_int(); 
-    prev_node = linkedlist_head;
-    temp_node = prev_node->next;
-    for(; temp_node != NULL; temp_node = temp_node->next)
+    int value = get_random_int() % NUMMAX; 
+    
+    down(&sem);
+    //printk("random delete: value=%d, linkedlist_len=%d\n", value, linkedlist_len);
+    if(linkedlist_len == 0)
     {
-        if(temp_node->value == value)
+        printk("random delete(no node): failed to delete %d\n", value);
+        up(&sem);
+        return -1;
+    }
+
+    prev_node = linkedlist_head;
+    iter_node = prev_node;
+
+    while(pos < linkedlist_len)
+    {
+        iter_node = iter_node->next;
+
+        if(iter_node->value == value)
         {
-            prev_node->next= temp_node;
-            kfree(temp_node);
+            if(pos == (linkedlist_len - 1))
+                prev_node->next = NULL;
+            else
+                prev_node->next = iter_node->next;
+
+            kfree(iter_node);
             linkedlist_len--;
             printk("random delete: delete %d on %d position in the linked list\n", value, pos);
+            up(&sem);
             return value;
         }
+
+        prev_node = prev_node->next;
         pos++;
     }
-    printk("random delete: failed to delete %d\n", value);
 
+    printk("random delete: failed to delete %d\n", value);
+//    for debugging / iterating a linkend list
+//    iter_node = linkedlist_head;
+//    for(pos = 0; pos < linkedlist_len; pos++)
+//    {
+//        iter_node = iter_node->next;
+//        printk("pos=%d, value=%d\n", pos, iter_node->value);
+//    }
+    up(&sem); 
     return -1;
 }
 
@@ -178,10 +208,7 @@ ssize_t dummy_read(struct file *file, char *buffer, size_t length, loff_t *offse
     if(copy_to_user(buffer, &value, sizeof(int)))
         return -EFAULT;
 
-    if(value == -1)
-        return -1;
-
-    return sizeof(int);
+    return 0;
 }
 
 ssize_t dummy_write(struct file *file, const char *buffer, size_t length, loff_t *offset)
@@ -190,9 +217,10 @@ ssize_t dummy_write(struct file *file, const char *buffer, size_t length, loff_t
 
     if(copy_from_user(&value, buffer, sizeof(int)))
         return -EFAULT;
+
     random_insert(value);
 
-    return sizeof(int);
+    return 0;
 }
 
 int dummy_open(struct inode *inode, struct file *file)
