@@ -105,6 +105,8 @@ irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 		falling_time = CURRENT_TIME;
 		LED_STATE[0] ++;
 		for (i = 0 ; i < NUM_LED; i ++){
+			/* it is binary addition if the LED_STATE is over 2 then subtract 2
+				and add 1 to higher LED_STATE */
 			if(LED_STATE[i] >= 2)
 			{
 				LED_STATE[i] -= 2;
@@ -121,6 +123,7 @@ irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 
 		printk("my_butten_rising_handler\n");
 		rising_time = CURRENT_TIME;
+		/* check the pushing duration if it is over 1 second then turn off all LEDs */
 		diff_time = timespec_sub(rising_time, falling_time);
 		printk ("time diff tv_sec: %ld , tv_nsec : %ld\n", diff_time.tv_sec, diff_time.tv_nsec);
 		button_state = 0;
@@ -172,9 +175,9 @@ static int __init bb_module_init(void)
 	gpio_direction_input(BUTTON_GPIO);
 	button_state = 0;
 	button_irt = gpio_to_irq(BUTTON_GPIO);
-
+	/* for debugging */
 	printk("button_irt : %d\n",button_irt);
-
+	/* request button irq */
 	ret_irq = request_irq(button_irt, my_butten_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "Button", NULL);
 
 	printk("ret_irq : %d\n",ret_irq);

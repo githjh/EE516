@@ -82,10 +82,14 @@ void my_timer_handler (unsigned long arg)
 		toggle_state = 0;
 		my_timer.expires = get_jiffies_64() + HZ;
 		/* leds will be turned on for 1 second */ 
+		/* change LED state to 1, this LED will be turned on  */
 		LED_STATE[light_pattern[arr_pos]] = 1;
 		led_on();
+		/* this LED will be turned off next timer interrupt */
 		LED_STATE[light_pattern[arr_pos]] = 0;
 		arr_pos ++;
+		/* if arr_pos is located out of the array range,
+		then arr_pos start from 0 again */
 		if (arr_pos == arr_len){
 			arr_pos = 0;
 		}

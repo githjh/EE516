@@ -100,19 +100,24 @@ void my_timer_handler (unsigned long arg)
 		}
 		toggle_state = 0;
 		my_timer.expires = get_jiffies_64() + HZ * 10 / 100;
-		/* leds will be turned on for 1 second */ 
+		/* leds will be turned on for 10/100 second */
+
+		/* turn on two LEDs*/ 
 		LED_STATE[light_pattern[arr_pos]] = 1;
 		LED_STATE[light_pattern[next_pos]] = 1;
 		led_on();
+		/* turn off the first one */
 		LED_STATE[light_pattern[arr_pos]] = 0;
 		//LED_STATE[light_pattern[next_pos]] = 0;
 		arr_pos  = next_pos;
 		
 	}
+	/* if the blink_num is less than MAX_BLINK then call add_timer */
 	if(start_blink && blink_num < MAX_BLINK){
 		add_timer(&my_timer);
 		blink_num ++;
 	}
+	/* after blinking time as MAx_BLINK then all leds turned off */
 	else{
 
 		led_off();
@@ -176,7 +181,9 @@ static int __init bb_module_init(void)
 
 	gpio_direction_input(BUTTON_GPIO);
 	button_state = 0;
+
 	button_irt = gpio_to_irq(BUTTON_GPIO);
+	/* request button irq */
 	ret_irq = request_irq(button_irt, my_butten_handler, IRQF_TRIGGER_FALLING, "Button", NULL);
 
 	my_timer_init(&my_timer);
