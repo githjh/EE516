@@ -17,9 +17,10 @@
 #define NUMMAX 10
 #define DUMMY_DEVICE_NAME "DUMMY_DEVICE"
 
+//node of a linked list
 typedef struct _linkedlist_t {
-    int value;
-    struct _linkedlist_t* next;
+    int value; //value
+    struct _linkedlist_t* next; //next node inside a linked-list
 } linkedlist_t;
 
 int dummy_open(struct inode *, struct file *);
@@ -43,22 +44,31 @@ char devicename[20];
 static struct cdev my_cdev;
 static dev_t device_num;   // For device minor number
 static struct class *cl;
-struct semaphore sem;
-static linkedlist_t *linkedlist_head;
-static int linkedlist_len = 0;
+struct semaphore sem; //semaphore used in random_insert() and random_delete()
+static linkedlist_t *linkedlist_head; //linked-list header
+static int linkedlist_len = 0; //length of the linked-list which head is 'linkedlist_head'
 
+/*************************************************************
+ * FUNCTION NAME: random_insert                                         
+ * PARAMETER: 1)value: a value which user want to write 
+ * PURPOSE: insert a node into the linked list in random postion  
+ ************************************************************/
 static void random_insert(int value)
 {
     linkedlist_t *iter_node, *new_node;
     int i;
+    //get a random value
     int rand_pos = get_random_int() % (linkedlist_len + 1); 
 
+    //get the lock (entering critical region)
     down(&sem);
     //printk("random insert: value=%d, rand_pos=%d, linkedlist_len=%d\n", value, rand_pos, linkedlist_len);
     iter_node = linkedlist_head;
+    //move into the random value's index inside the linked-list
     for (i = 0; i < rand_pos; i++) 
         iter_node = iter_node->next;
     
+    //case1: randomly selected position is tail of the linked-list
     if(rand_pos == linkedlist_len)
     {
         new_node = (linkedlist_t *)kmalloc(sizeof(linkedlist_t), __GFP_IO | __GFP_FS);
@@ -68,6 +78,7 @@ static void random_insert(int value)
 
         printk("random insert: write %d on %d position in the linked list\n", value, rand_pos); 
     }
+    //case2: randomly selected position is not tail of the linked-list
     else
     {
         new_node = (linkedlist_t *)kmalloc(sizeof(linkedlist_t), __GFP_IO | __GFP_FS);
@@ -78,17 +89,26 @@ static void random_insert(int value)
         printk("random insert: write %d on %d position in the linked list\n", value, rand_pos); 
     }
     linkedlist_len++;
+    //release the lock
     up(&sem);
 }
 
+/*************************************************************
+ * FUNCTION NAME: randomd_delete                                         
+ * PARAMETER: NONE                                              
+ * PURPOSE: delete a node randomly 
+ ************************************************************/
 static int random_delete(void)
 {
     linkedlist_t *prev_node, *iter_node;
     int pos = 0;
+    //get a random value
     int value = get_random_int() % NUMMAX; 
     
+    //get the lock (entering the critical region)
     down(&sem);
     //printk("random delete: value=%d, linkedlist_len=%d\n", value, linkedlist_len);
+    //if the linked-list has no elements, return -1
     if(linkedlist_len == 0)
     {
         printk("random delete(no node): failed to delete %d\n", value);
@@ -99,10 +119,12 @@ static int random_delete(void)
     prev_node = linkedlist_head;
     iter_node = prev_node;
 
+    //traverse through the linked-list, and find a node which has same value as the random value above
     while(pos < linkedlist_len)
     {
         iter_node = iter_node->next;
 
+        //case 1: find a node
         if(iter_node->value == value)
         {
             if(pos == (linkedlist_len - 1))
@@ -121,6 +143,7 @@ static int random_delete(void)
         pos++;
     }
 
+    //case 2: fail to find a node
     printk("random delete: failed to delete %d\n", value);
 //    for debugging / iterating a linkend list
 //    iter_node = linkedlist_head;
@@ -129,6 +152,7 @@ static int random_delete(void)
 //        iter_node = iter_node->next;
 //        printk("pos=%d, value=%d\n", pos, iter_node->value);
 //    }
+    //release the lock
     up(&sem); 
     return -1;
 }
@@ -200,6 +224,7 @@ static void __exit dummy_exit(void)
     unregister_chrdev_region(MKDEV(DUMMY_MAJOR_NUMBER,0),128);
 }
 
+//read a random value from the linked-list and copy it to a user buffer
 ssize_t dummy_read(struct file *file, char *buffer, size_t length, loff_t *offset)
 {
     int value;
@@ -211,6 +236,7 @@ ssize_t dummy_read(struct file *file, char *buffer, size_t length, loff_t *offse
     return 0;
 }
 
+//get a random value from a user buffer and write it into the linked-list
 ssize_t dummy_write(struct file *file, const char *buffer, size_t length, loff_t *offset)
 {
     int value;
