@@ -29,8 +29,12 @@
 #define LED3_GPIO   56    /* USER LED 3     */
 #define BUTTON_GPIO 72    /* USER BUTTON S2 */
 
+
+/* LED_STATE: save led state whether it is on or off */
 int LED_STATE[NUM_LED];
 
+
+/* initialize gpio(LED)  */
 static int __init bb_module_init(void)
 {	
 	int i;
@@ -49,6 +53,7 @@ static int __init bb_module_init(void)
 	return 0;
 }
 
+/* bb_module_exit : turn off all led, and gpio free*/
 static void __exit bb_module_exit(void)
 {		
 	printk("[EE516] BB module exit.\n");

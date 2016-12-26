@@ -29,6 +29,7 @@
 #define LED3_GPIO   56    /* USER LED 3     */
 #define BUTTON_GPIO 72    /* USER BUTTON S2 */
 
+/* max number of blinks */
 #define MAX_BLINK 	20
 struct timer_list my_timer;
 
@@ -47,8 +48,10 @@ struct timespec rising_time;
 
 int arr_pos;
 int arr_len;
+/* this pattern means that LED0 light on, and next LED 1 -> LED2 -> LED3 -> LED0 ....*/
 char light_pattern[] ={0, 1, 2, 3};
 
+/* check LED state and turn on */
 void led_on(void){
 	int i;
 
@@ -59,6 +62,8 @@ void led_on(void){
 	}
 }
 
+/* turn off all LEDs */
+
 void led_off(void ){
 	int i;
 	
@@ -67,7 +72,17 @@ void led_off(void ){
 	}
 
 }
+/* 	function behavior
 
+	toggle_state is 0 : change toggle_state to 1, and set expire time as 1/100
+						turn off all led
+	toggle_state is 1 : change toggle_state to 0, and set expire time as 10/100
+						set two leds' state to 1 and turn on that leds
+						change state of first led to 1
+	if blink_num is less than MAX_BLINK, then add timer and do this agaion
+	unless turn off all leds and finished.
+
+	 */
 void my_timer_handler (unsigned long arg)
 {
 	printk("my_timer_handler \n");
@@ -75,7 +90,7 @@ void my_timer_handler (unsigned long arg)
 	if(toggle_state == 0){
 		toggle_state = 1;
 		my_timer.expires = get_jiffies_64() + HZ * 1/ 100;
-		/* leds will be turned off for 1 second */
+		/* leds will be turned off for 1/100 second */
 		led_off();
 	}
 	else{
@@ -106,6 +121,8 @@ void my_timer_handler (unsigned long arg)
 	}
 }
 
+/* if you press the butten, then it will change start_blink to 1 and triger timer */
+
 irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 	
 	int i;
@@ -113,6 +130,7 @@ irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 		LED_STATE[i] = 0;
 	}	
 	start_blink = 1;
+	blink_num = 0;
 	arr_pos = 0;
 	my_timer.expires = get_jiffies_64() + HZ * 10 / 100;
 	add_timer(&my_timer);
@@ -120,6 +138,8 @@ irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 	return IRQ_HANDLED;
 	
 }
+
+/* timer initialization */
 
 int my_timer_init(struct timer_list * timer){
 	init_timer(timer);
@@ -130,6 +150,9 @@ int my_timer_init(struct timer_list * timer){
 	return 0;
 }
 
+
+/* initialize gpio(LED, BUTTON) 
+	initialize timer */
 
 static int __init bb_module_init(void)
 {	
@@ -161,6 +184,8 @@ static int __init bb_module_init(void)
 
 	return 0;
 }
+
+/* bb_module_exit : turn off all led, gpio free, del_timer and free_irq */
 
 static void __exit bb_module_exit(void)
 {		

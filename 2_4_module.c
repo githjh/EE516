@@ -41,7 +41,7 @@ int button_irt;
 struct timespec falling_time;
 struct timespec rising_time;
 
-
+/* check LED state and turn on */
 void led_on(void){
 	int i;
 
@@ -52,6 +52,7 @@ void led_on(void){
 	}
 }
 
+/* turn off all LEDs */
 void led_off(void ){
 	int i;
 	
@@ -60,6 +61,14 @@ void led_off(void ){
 	}
 
 }
+
+/* 	function behavior
+
+	toggle_state is 0 : change toggle_state to 1, and set expire time as 2/10
+						turn off all led. It means that led turned off for 0.2 seconds
+	toggle_state is 1 : change toggle_state to 0, and set expire time as 8/10
+						call led_on(). led will be turned on for 0.8 seconds
+*/
 
 void my_timer_handler (unsigned long arg)
 {
@@ -79,6 +88,12 @@ void my_timer_handler (unsigned long arg)
 	}
 	add_timer(&my_timer);
 }
+
+/* button handler : button_state is 0 : falling state, increase counter(change led states) 
+										and change butten state 
+					button_state is 1 : rising state, check button has been pressed over 1 second 
+										if it is true, then turn off all leds. 
+*/
 
 irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 	
@@ -120,6 +135,7 @@ irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 	return IRQ_HANDLED;
 	
 }
+/* initialize timer: set expire time and handling function */
 
 int my_timer_init(struct timer_list * timer){
 	init_timer(timer);
@@ -130,17 +146,22 @@ int my_timer_init(struct timer_list * timer){
 	return 0;
 }
 
+/* initialize gpio(LED, BUTTON) 
+	initialize timer */
 
 static int __init bb_module_init(void)
 {	
 	int i;
 	int ret_irq;
+	int gpio_request_button;
 	printk("[EE516] Initializing BB module completed.\n");
 	gpio_request(LED0_GPIO, "LED0_GPIO");
 	gpio_request(LED1_GPIO, "LED0_GPI1");
 	gpio_request(LED2_GPIO, "LED0_GPI2");
-	gpio_request(LED3_GPIO, "LED0_GPI3");
+	gpio_request_button = gpio_request(LED3_GPIO, "LED0_GPI3");
 
+	printk("gpio_request_button : %d\n",button_irt);
+	
 	gpio_request(BUTTON_GPIO,"BUTTON");
 
 	for (i = 0 ; i< NUM_LED ; i++){
@@ -151,13 +172,20 @@ static int __init bb_module_init(void)
 	gpio_direction_input(BUTTON_GPIO);
 	button_state = 0;
 	button_irt = gpio_to_irq(BUTTON_GPIO);
+
+	printk("button_irt : %d\n",button_irt);
+
 	ret_irq = request_irq(button_irt, my_butten_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "Button", NULL);
 
+	printk("ret_irq : %d\n",ret_irq);
+	
 	my_timer_init(&my_timer);
 	add_timer(&my_timer);
 
 	return 0;
 }
+
+/* bb_module_exit : turn off all led, gpio free, del_timer and free_irq */
 
 static void __exit bb_module_exit(void)
 {		
