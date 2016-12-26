@@ -76,7 +76,7 @@ static void random_insert(int value)
         new_node->next = NULL;
         iter_node->next = new_node;
 
-        printk("random insert: write %d on %d position in the linked list\n", value, rand_pos); 
+        printk("random insert: write %d on %d position in the linked list || linked-list size=%d\n", value, rand_pos, linkedlist_len); 
     }
     //case2: randomly selected position is not tail of the linked-list
     else
@@ -86,7 +86,7 @@ static void random_insert(int value)
         new_node->next = iter_node->next;
         iter_node->next = new_node;
 
-        printk("random insert: write %d on %d position in the linked list\n", value, rand_pos); 
+        printk("random insert: write %d on %d position in the linked list || linked-list size=%d\n", value, rand_pos, linkedlist_len); 
     }
     linkedlist_len++;
     //release the lock
@@ -111,7 +111,7 @@ static int random_delete(void)
     //if the linked-list has no elements, return -1
     if(linkedlist_len == 0)
     {
-        printk("random delete(no node): failed to delete %d\n", value);
+        printk("random delete(no node): failed to delete %d, linked-list size=%d\n", value, linkedlist_len);
         up(&sem);
         return -1;
     }
@@ -134,7 +134,7 @@ static int random_delete(void)
 
             kfree(iter_node);
             linkedlist_len--;
-            printk("random delete: delete %d on %d position in the linked list\n", value, pos);
+            printk("random delete: delete %d on %d position in the linked list || linked-list size=%d\n", value, pos, linkedlist_len);
             up(&sem);
             return value;
         }
@@ -144,7 +144,7 @@ static int random_delete(void)
     }
 
     //case 2: fail to find a node
-    printk("random delete: failed to delete %d\n", value);
+    printk("random delete: failed to delete %d || linked-list size=%d\n", value, linkedlist_len);
 //    for debugging / iterating a linkend list
 //    iter_node = linkedlist_head;
 //    for(pos = 0; pos < linkedlist_len; pos++)
