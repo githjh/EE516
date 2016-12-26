@@ -29,8 +29,6 @@
 #define LED3_GPIO   56    /* USER LED 3     */
 #define BUTTON_GPIO 72    /* USER BUTTON S2 */
 
-/* max number of blinks */
-#define MAX_BLINK 	20
 struct timer_list my_timer;
 
 /* LED_STATE: save led state whether it is on or off */
@@ -40,16 +38,8 @@ int toggle_state;
 int button_state;
 int button_irt;
 
-int blink_num;
-int start_blink;
-
 struct timespec falling_time;
 struct timespec rising_time;
-
-int arr_pos;
-int arr_len;
-/* this pattern means that LED0 light on, and next LED 1 -> LED2 -> LED3 -> LED0 ....*/
-char light_pattern[] ={0, 1, 2, 3};
 
 /* check LED state and turn on */
 void led_on(void){
@@ -63,7 +53,6 @@ void led_on(void){
 }
 
 /* turn off all LEDs */
-
 void led_off(void ){
 	int i;
 	
@@ -72,79 +61,84 @@ void led_off(void ){
 	}
 
 }
+
 /* 	function behavior
 
-	toggle_state is 0 : change toggle_state to 1, and set expire time as 1/100
-						turn off all led
-	toggle_state is 1 : change toggle_state to 0, and set expire time as 10/100
-						set two leds' state to 1 and turn on that leds
-						change state of first led to 1
-	if blink_num is less than MAX_BLINK, then add timer and do this agaion
-	unless turn off all leds and finished.
+	toggle_state is 0 : change toggle_state to 1, and set expire time as 2/10
+						turn off all led. It means that led turned off for 0.2 seconds
+	toggle_state is 1 : change toggle_state to 0, and set expire time as 8/10
+						call led_on(). led will be turned on for 0.8 seconds
+*/
 
-	 */
 void my_timer_handler (unsigned long arg)
 {
 	printk("my_timer_handler \n");
 
 	if(toggle_state == 0){
 		toggle_state = 1;
-		my_timer.expires = get_jiffies_64() + HZ * 1/ 100;
-		/* leds will be turned off for 1/100 second */
+		my_timer.expires = get_jiffies_64() + HZ *2 /10;
+		/* leds will be turned off for 0.2 second */
 		led_off();
 	}
 	else{
-		int next_pos = arr_pos +1;
-		if(next_pos == arr_len){
-			next_pos = 0;
-		}
 		toggle_state = 0;
-		my_timer.expires = get_jiffies_64() + HZ * 10 / 100;
-		/* leds will be turned on for 10/100 second */
-
-		/* turn on two LEDs*/ 
-		LED_STATE[light_pattern[arr_pos]] = 1;
-		LED_STATE[light_pattern[next_pos]] = 1;
+		my_timer.expires = get_jiffies_64() + HZ *8 / 10;
+		/* leds will be turned on for 0.8 second */ 
 		led_on();
-		/* turn off the first one */
-		LED_STATE[light_pattern[arr_pos]] = 0;
-		//LED_STATE[light_pattern[next_pos]] = 0;
-		arr_pos  = next_pos;
-		
 	}
-	/* if the blink_num is less than MAX_BLINK then call add_timer */
-	if(start_blink && blink_num < MAX_BLINK){
-		add_timer(&my_timer);
-		blink_num ++;
-	}
-	/* after blinking time as MAx_BLINK then all leds turned off */
-	else{
-
-		led_off();
-		start_blink = 0;
-		blink_num = 0;
-	}
+	add_timer(&my_timer);
 }
 
-/* if you press the butten, then it will change start_blink to 1 and triger timer */
+/* button handler : button_state is 0 : falling state, increase counter(change led states) 
+										and change butten state 
+					button_state is 1 : rising state, check button has been pressed over 1 second 
+										if it is true, then turn off all leds. 
+*/
 
 irqreturn_t my_butten_handler(int irq, void *dev_id, struct pt_regs *pegs){
 	
-	int i;
-	for(i = 0 ; i< NUM_LED ; i++){
-		LED_STATE[i] = 0;
-	}	
-	start_blink = 1;
-	blink_num = 0;
-	arr_pos = 0;
-	my_timer.expires = get_jiffies_64() + HZ * 10 / 100;
-	add_timer(&my_timer);
-		
+	/* falling handler */
+	if(button_state == 0){
+
+		int i;
+		printk("my_butten_falling_handler\n");
+		falling_time = CURRENT_TIME;
+		LED_STATE[0] ++;
+		for (i = 0 ; i < NUM_LED; i ++){
+			/* it is binary addition if the LED_STATE is over 2 then subtract 2
+				and add 1 to higher LED_STATE */
+			if(LED_STATE[i] >= 2)
+			{
+				LED_STATE[i] -= 2;
+				if(i+1 < NUM_LED){
+					LED_STATE[i+1] += 1;
+				}
+			}
+		}
+		button_state = 1;
+	}
+	/* rising handler : check time difference between falling time and rising time*/
+	else{
+		struct timespec diff_time;
+
+		printk("my_butten_rising_handler\n");
+		rising_time = CURRENT_TIME;
+		/* check the pushing duration if it is over 1 second then turn off all LEDs */
+		diff_time = timespec_sub(rising_time, falling_time);
+		printk ("time diff tv_sec: %ld , tv_nsec : %ld\n", diff_time.tv_sec, diff_time.tv_nsec);
+		button_state = 0;
+		if(diff_time.tv_sec >= 1){
+			int i;
+			for(i = 0; i< NUM_LED; i ++){
+				LED_STATE[i] = 0;
+			}
+
+		}
+	}
 	return IRQ_HANDLED;
 	
 }
-
-/* timer initialization */
+/* initialize timer: set expire time and handling function */
 
 int my_timer_init(struct timer_list * timer){
 	init_timer(timer);
@@ -155,7 +149,6 @@ int my_timer_init(struct timer_list * timer){
 	return 0;
 }
 
-
 /* initialize gpio(LED, BUTTON) 
 	initialize timer */
 
@@ -163,16 +156,16 @@ static int __init bb_module_init(void)
 {	
 	int i;
 	int ret_irq;
+	int gpio_request_button;
 	printk("[EE516] Initializing BB module completed.\n");
 	gpio_request(LED0_GPIO, "LED0_GPIO");
 	gpio_request(LED1_GPIO, "LED0_GPI1");
 	gpio_request(LED2_GPIO, "LED0_GPI2");
-	gpio_request(LED3_GPIO, "LED0_GPI3");
+	gpio_request_button = gpio_request(LED3_GPIO, "LED0_GPI3");
 
+	printk("gpio_request_button : %d\n",button_irt);
+	
 	gpio_request(BUTTON_GPIO,"BUTTON");
-
-	arr_len = sizeof(light_pattern);
-	arr_pos = 0;
 
 	for (i = 0 ; i< NUM_LED ; i++){
 		LED_STATE[i] = 0;
@@ -181,11 +174,14 @@ static int __init bb_module_init(void)
 
 	gpio_direction_input(BUTTON_GPIO);
 	button_state = 0;
-
 	button_irt = gpio_to_irq(BUTTON_GPIO);
+	/* for debugging */
+	printk("button_irt : %d\n",button_irt);
 	/* request button irq */
-	ret_irq = request_irq(button_irt, my_butten_handler, IRQF_TRIGGER_FALLING, "Button", NULL);
+	ret_irq = request_irq(button_irt, my_butten_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "Button", NULL);
 
+	printk("ret_irq : %d\n",ret_irq);
+	
 	my_timer_init(&my_timer);
 	add_timer(&my_timer);
 

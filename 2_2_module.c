@@ -44,6 +44,7 @@ int arr_pos;
 int arr_len;
 char light_pattern[] ={0, 1, 2, 3, 2, 1};
 
+/* check LED state and turn on */
 void led_on(void){
 	int i;
 
@@ -54,6 +55,7 @@ void led_on(void){
 	}
 }
 
+/* turn off all LEDs */
 void led_off(void ){
 	int i;
 	
@@ -63,6 +65,9 @@ void led_off(void ){
 
 }
 
+/* turn on a led on 1 second, and turn off a led on 1 second
+	this will not be stopped util removing module 
+	*/
 void my_timer_handler (unsigned long arg)
 {
 	printk("my_timer_handler \n");
@@ -77,10 +82,14 @@ void my_timer_handler (unsigned long arg)
 		toggle_state = 0;
 		my_timer.expires = get_jiffies_64() + HZ;
 		/* leds will be turned on for 1 second */ 
+		/* change LED state to 1, this LED will be turned on  */
 		LED_STATE[light_pattern[arr_pos]] = 1;
 		led_on();
+		/* this LED will be turned off next timer interrupt */
 		LED_STATE[light_pattern[arr_pos]] = 0;
 		arr_pos ++;
+		/* if arr_pos is located out of the array range,
+		then arr_pos start from 0 again */
 		if (arr_pos == arr_len){
 			arr_pos = 0;
 		}
@@ -88,6 +97,7 @@ void my_timer_handler (unsigned long arg)
 	add_timer(&my_timer);
 }
 
+/* initialize timer : set expire time and handling function */
 
 int my_timer_init(struct timer_list * timer){
 	init_timer(timer);
@@ -98,7 +108,8 @@ int my_timer_init(struct timer_list * timer){
 	return 0;
 }
 
-
+/* initialize gpio(LED), set LED_STATE variable, 
+	timer initialization and add_timer */
 static int __init bb_module_init(void)
 {	
 	int i;
@@ -124,6 +135,7 @@ static int __init bb_module_init(void)
 	return 0;
 }
 
+/* turn off all LEDs and free all gpio */
 static void __exit bb_module_exit(void)
 {		
 	printk("[EE516] BB module exit.\n");
